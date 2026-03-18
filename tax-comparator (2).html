@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>正社員 手取りシミュレーター</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f8fafc; --surface: #ffffff; --surface2: #f1f5f9;
+    --border: #e2e8f0; --border-dark: #cbd5e1;
+    --accent: #0ea5e9; --accent-light: #e0f2fe; --accent-dark: #0369a1;
+    --green: #059669; --green-light: #d1fae5;
+    --red: #dc2626; --red-light: #fee2e2;
+    --yellow: #d97706; --yellow-light: #fef3c7;
+    --purple: #7c3aed; --purple-light: #ede9fe;
+    --orange: #ea580c; --orange-light: #fff7ed;
+    --text: #0f172a; --text-muted: #64748b; --text-light: #94a3b8;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', sans-serif; min-height: 100vh; font-size: 14px; line-height: 1.6; }
+
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow); }
+  .topbar-logo { font-weight: 900; font-size: 15px; color: var(--accent-dark); letter-spacing: -0.5px; }
+  .topbar-sep { width: 1px; height: 20px; background: var(--border-dark); }
+  .topbar-badge { font-size: 10px; background: var(--accent-light); color: var(--accent-dark); border-radius: 100px; padding: 2px 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+  .wrapper { max-width: 960px; margin: 0 auto; padding: 28px 16px 56px; }
+
+  .page-header { margin-bottom: 24px; animation: fadeDown 0.5s ease both; }
+  .page-header h1 { font-size: clamp(22px,5vw,30px); font-weight: 900; letter-spacing: -0.8px; }
+  .page-header h1 span { color: var(--accent-dark); }
+  .page-header p { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin-bottom: 16px; box-shadow: var(--shadow); animation: fadeUp 0.4s ease both; }
+  .card-title { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .dot.green { background: var(--green); } .dot.yellow { background: var(--yellow); }
+  .dot.purple { background: var(--purple); } .dot.orange { background: var(--orange); }
+
+  .input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 14px; }
+  .field label { display: block; font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 5px; }
+  .input-wrap { position: relative; }
+  .field input, .field select { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 36px 8px 12px; font-size: 14px; font-family: 'Noto Sans JP',sans-serif; font-weight: 500; outline: none; transition: border-color 0.15s; appearance: none; -webkit-appearance: none; }
+  .field input:focus, .field select:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px rgba(14,165,233,0.12); }
+  .input-unit { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-light); pointer-events: none; font-family: 'JetBrains Mono',monospace; }
+  .field-note { font-size: 10px; color: var(--text-light); margin-top: 3px; }
+
+  .sec-div { display: flex; align-items: center; gap: 10px; margin: 18px 0 14px; font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.06em; }
+  .sec-div::before, .sec-div::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* トグル */
+  .toggle-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; padding: 12px 14px; background: var(--orange-light); border: 1.5px solid #fed7aa; border-radius: 10px; }
+  .toggle-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-track { position: absolute; inset: 0; background: #cbd5e1; border-radius: 100px; cursor: pointer; transition: background 0.2s; }
+  .toggle-track::after { content: ''; position: absolute; width: 18px; height: 18px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .toggle-switch input:checked + .toggle-track { background: var(--orange); }
+  .toggle-switch input:checked + .toggle-track::after { transform: translateX(20px); }
+  .toggle-label { font-size: 13px; font-weight: 700; color: var(--orange); }
+  .toggle-sub { font-size: 11px; color: var(--text-muted); }
+
+  /* 労働時間 */
+  .ot-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 10px; margin-bottom: 14px; }
+  .ot-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .ot-item-label { font-size: 10px; color: var(--text-muted); margin-bottom: 3px; }
+  .ot-item-val { font-size: 16px; font-weight: 700; color: var(--text); font-family: 'JetBrains Mono',monospace; }
+  .ot-item-sub { font-size: 10px; color: var(--text-light); margin-top: 2px; }
+
+  /* 時給バー */
+  .hourly-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .hourly-row-label { font-size: 11px; color: var(--text-muted); width: 140px; flex-shrink: 0; }
+  .hourly-bar-bg { flex: 1; background: var(--surface2); border-radius: 100px; height: 22px; overflow: hidden; }
+  .hourly-bar-fill { height: 100%; border-radius: 100px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; font-size: 10px; font-weight: 700; color: #fff; transition: width 0.4s; min-width: 50px; font-family: 'JetBrains Mono',monospace; }
+  .hw-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 100px; margin-top: 8px; }
+  .hw-ok { background: var(--green-light); color: var(--green); }
+  .hw-ng { background: var(--red-light); color: var(--red); }
+
+  /* キャリアアップ比較テーブル（縦レイアウト） */
+  .cu-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  .cu-col { border-radius: 10px; padding: 16px 18px; border: 1.5px solid; }
+  .cu-col.base { background: #eff6ff; border-color: #93c5fd; }
+  .cu-col.up { background: var(--orange-light); border-color: #fdba74; }
+  .cu-col-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 10px; font-family: 'JetBrains Mono',monospace; }
+  .base .cu-col-tag { color: #1d4ed8; }
+  .up .cu-col-tag { color: var(--orange); }
+  .cu-col-amount { font-size: clamp(22px,5vw,32px); font-weight: 900; line-height: 1; margin-bottom: 2px; }
+  .base .cu-col-amount { color: #1e40af; }
+  .up .cu-col-amount { color: #c2410c; }
+  .cu-col-sub { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+  .cu-col-rows { display: flex; flex-direction: column; gap: 4px; }
+  .cu-col-row { display: flex; justify-content: space-between; font-size: 11px; }
+  .cu-col-row span:first-child { color: var(--text-muted); }
+
+  /* 詳細テーブル */
+  .detail-scroll { overflow-x: auto; }
+  .detail-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 340px; }
+  .detail-table th { padding: 9px 12px; font-size: 11px; font-weight: 700; border-bottom: 2px solid var(--border-dark); white-space: nowrap; }
+  .detail-table th:first-child { text-align: left; color: var(--text-muted); }
+  .detail-table th.th-base { text-align: right; color: #1d4ed8; background: #eff6ff; }
+  .detail-table th.th-up   { text-align: right; color: var(--orange); background: var(--orange-light); }
+  .detail-table th.th-diff { text-align: right; color: var(--green); background: var(--green-light); }
+  .detail-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  .detail-table td:first-child { color: var(--text-muted); font-size: 12px; }
+  .detail-table td:not(:first-child) { text-align: right; font-family: 'JetBrains Mono',monospace; }
+  .detail-table tr:hover td { background: var(--surface2); }
+  .detail-table tr.hl td { font-weight: 700; background: #f0f9ff; border-top: 2px solid var(--border-dark); border-bottom: 2px solid var(--border-dark); }
+  .detail-table tr.hl td:first-child { color: var(--text); font-size: 13px; }
+
+  /* チャート */
+  .chart-wrap { position: relative; height: 280px; margin-top: 8px; }
+
+  /* 会社負担 */
+  .burden-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 10px; margin-bottom: 10px; }
+  .burden-item { background: var(--purple-light); border: 1px solid #c4b5fd; border-radius: 8px; padding: 10px 12px; }
+  .burden-label { font-size: 9px; color: var(--text-muted); margin-bottom: 3px; }
+  .burden-val { font-size: 15px; font-weight: 700; color: var(--purple); font-family: 'JetBrains Mono',monospace; }
+  .burden-total { font-size: 12px; color: var(--text-muted); }
+  .burden-total em { color: var(--purple); font-style: normal; font-weight: 700; }
+
+  .footer { text-align: center; font-size: 10px; color: var(--text-light); padding-top: 12px; }
+  @keyframes fadeDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeUp   { from { opacity:0; transform:translateY(12px);  } to { opacity:1; transform:translateY(0); } }
+  @media (max-width: 540px) { .cu-compare { grid-template-columns: 1fr; } .topbar-badge { display:none; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-logo">💼 正社員 手取りシミュレーター</span>
+  <div class="topbar-sep"></div>
+  <span class="topbar-badge">2025年度対応</span>
+</div>
+
+<div class="wrapper">
+  <div class="page-header">
+    <h1>正社員 <span>手取り</span> シミュレーター</h1>
+    <p>固定残業・賞与按分・キャリアアップ助成金による昇給を即時計算</p>
+  </div>
+
+  <!-- INPUT -->
+  <div class="card" style="animation-delay:0s">
+    <div class="card-title"><span class="dot"></span>入力条件</div>
+
+    <div class="sec-div">事業所・基本情報</div>
+    <div class="input-grid">
+      <div class="field">
+        <label>勤務地・事業所</label>
+        <div class="input-wrap">
+          <select id="office">
+            <option value="tokyo">東京</option>
+            <option value="osaka">大阪</option>
+            <option value="fukuoka">福岡</option>
+            <option value="sapporo">札幌</option>
+          </select>
+          <span class="input-unit">▾</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>年齢</label>
+        <div class="input-wrap">
+          <input type="number" id="age" value="35" min="18" max="75">
+          <span class="input-unit">歳</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>入社日</label>
+        <div class="input-wrap">
+          <input type="date" id="joinDate" value="2025-04-01">
+        </div>
+        <div class="field-note">賞与算定・助成金昇給日の計算に使用</div>
+      </div>
+      <div class="field">
+        <label>対象年度</label>
+        <div class="input-wrap">
+          <select id="year">
+            <option value="2024">2024年度</option>
+            <option value="2025" selected>2025年度</option>
+            <option value="2026">2026年度</option>
+          </select>
+          <span class="input-unit">▾</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-div">労働時間</div>
+    <div class="input-grid">
+      <div class="field">
+        <label>1日の所定労働時間</label>
+        <div class="input-wrap">
+          <input type="number" id="dailyHours" value="8" min="1" max="10" step="0.5">
+          <span class="input-unit">時間</span>
+        </div>
+        <div class="field-note">休憩を除いた実労働時間</div>
+      </div>
+      <div class="field">
+        <label>固定残業時間（月）</label>
+        <div class="input-wrap">
+          <input type="number" id="otHours" value="45" min="0" max="80" step="1">
+          <span class="input-unit">時間</span>
+        </div>
+        <div class="field-note">みなし残業・固定残業の時間数</div>
+      </div>
+    </div>
+
+    <div class="sec-div">給与</div>
+    <div class="input-grid">
+      <div class="field">
+        <label>月額総支給（固定残業込）</label>
+        <div class="input-wrap">
+          <input type="number" id="basicSalary" value="25" min="10" max="500" step="0.5">
+          <span class="input-unit">万円</span>
+        </div>
+        <div class="field-note">基本給＋固定残業代を逆算して表示</div>
+      </div>
+      <div class="field">
+        <label>賞与 年間合計（満額）</label>
+        <div class="input-wrap">
+          <input type="number" id="bonus" value="0" min="0" max="2000" step="10">
+          <span class="input-unit">万円</span>
+        </div>
+        <div class="field-note">入社日により算定月数を按分して計算</div>
+      </div>
+    </div>
+
+    <div class="sec-div">キャリアアップ助成金</div>
+    <div class="toggle-row">
+      <label class="toggle-switch">
+        <input type="checkbox" id="careerUp">
+        <span class="toggle-track"></span>
+      </label>
+      <div>
+        <div class="toggle-label">🎯 キャリアアップ助成金を利用する</div>
+        <div class="toggle-sub">入社6ヶ月後に月額総支給を3%アップする必要があります</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERTIME -->
+  <div class="card" style="animation-delay:0.08s">
+    <div class="card-title"><span class="dot yellow"></span>労働時間の内訳と時給比較</div>
+    <div id="work-hours-summary" style="margin-bottom:14px"></div>
+    <div class="ot-grid" id="ot-grid"></div>
+    <div id="hourly-section"></div>
+  </div>
+
+  <!-- BONUS -->
+  <div class="card" style="animation-delay:0.12s">
+    <div class="card-title"><span class="dot green"></span>賞与の算定内訳</div>
+    <div id="bonus-breakdown"></div>
+  </div>
+
+  <!-- CAREER UP COMPARISON (縦並び) -->
+  <div class="card" style="animation-delay:0.16s" id="cu-card">
+    <div class="card-title"><span class="dot orange"></span>キャリアアップ助成金 ― 昇給シミュレーション</div>
+    <div id="cu-content"></div>
+  </div>
+
+  <!-- DETAIL TABLE -->
+  <div class="card" style="animation-delay:0.20s">
+    <div class="card-title"><span class="dot"></span>詳細テーブル</div>
+    <div class="detail-scroll">
+      <table class="detail-table">
+        <thead id="detail-thead"></thead>
+        <tbody id="detail-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CHART -->
+  <div class="card" style="animation-delay:0.24s">
+    <div class="card-title"><span class="dot"></span>年収内訳比較（万円）</div>
+    <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+  </div>
+
+  <!-- BURDEN -->
+  <div class="card" style="animation-delay:0.28s">
+    <div class="card-title"><span class="dot purple"></span>会社が負担している社会保険料（正社員の隠れたコスト）</div>
+    <div class="burden-grid" id="burden-grid"></div>
+    <div class="burden-total" id="burden-total"></div>
+  </div>
+
+  <div class="footer">※本計算は概算です。実際の税額・保険料は個人の状況により異なります。税理士等の専門家にご相談ください。</div>
+</div>
+
+<script>
+const OFFICE_DATA = {
+  tokyo:   { label: '東京', pref: '東京都', minWage: 1226 },
+  osaka:   { label: '大阪', pref: '大阪府', minWage: 1177 },
+  fukuoka: { label: '福岡', pref: '福岡県', minWage: 1057 },
+  sapporo: { label: '札幌', pref: '北海道', minWage: 1075 },
+};
+
+function getStdRemun(m) {
+  const lv = [58000,68000,78000,88000,98000,104000,110000,118000,126000,134000,142000,150000,160000,170000,180000,190000,200000,220000,240000,260000,280000,300000,320000,340000,360000,380000,410000,440000,470000,500000,530000,560000,590000,620000,650000,680000,710000,750000,800000,855000,905000,955000,1005000,1055000,1175000,1295000,1390000,1500000];
+  for (const l of lv) if (m <= l * 1.025) return l;
+  return lv[lv.length - 1];
+}
+
+function getEmpDeduction(a) {
+  if (a <= 1625000) return 550000;
+  if (a <= 1800000) return a * 0.4 - 100000;
+  if (a <= 3600000) return a * 0.3 + 80000;
+  if (a <= 6600000) return a * 0.2 + 440000;
+  if (a <= 8500000) return a * 0.1 + 1100000;
+  return 1950000;
+}
+
+function calcIT(ti) {
+  if (ti <= 0) return 0;
+  const b = [[1950000,0.05,0],[3300000,0.10,97500],[6950000,0.20,427500],[9000000,0.23,636000],[18000000,0.33,1536000],[40000000,0.40,2796000],[Infinity,0.45,4796000]];
+  for (const [lim,r,d] of b) if (ti <= lim) return ti * r - d;
+  return 0;
+}
+
+const AVG_WORK_DAYS = 20.16;
+
+// 基本給切り捨て → 固定残業代 = 総支給 − 基本給 で合計保証
+function calcOT(totalM, dailyH, otH) {
+  const regH = AVG_WORK_DAYS * dailyH;
+  const basicM = Math.floor(totalM / (regH + otH * 1.25) * regH);
+  const otPay  = totalM - basicM;
+  return { regH, basicM, otPay, hourlyBase: basicM / regH, actualH: totalM / (regH + otH) };
+}
+
+function calcEmp(totalM, bonusAnnual, age, dailyH, otH) {
+  const ot = calcOT(totalM, dailyH, otH);
+  const annual = totalM * 12 + bonusAnnual;
+  const std = getStdRemun(totalM);
+  const stdBonus = Math.min(bonusAnnual, 15730000);
+  const health  = std * 0.05 * 12   + stdBonus * 0.05;
+  const nursing = age >= 40 ? (std * 0.0091 * 12 + stdBonus * 0.0091) : 0;
+  const pension = Math.min(std,650000) * 0.0915 * 12 + Math.min(stdBonus,1800000) * 0.0915;
+  const employ  = annual * 0.006;
+  const totalSI = health + nursing + pension + employ;
+  const empDed  = getEmpDeduction(annual);
+  const it = Math.max(0, calcIT(Math.max(0, annual - empDed - totalSI - 480000))) * 1.021;
+  const rt = Math.max(0, annual - empDed - totalSI - 430000) * 0.10 + 5000;
+  const totalTax = it + rt;
+  return {
+    ...ot, totalM, annual, bonusAnnual, empDed,
+    health, nursing, pension, employ, totalSI, it, rt, totalTax,
+    takeHome: annual - totalSI - totalTax,
+    cHealth: health, cNursing: nursing, cPension: pension,
+    cEmploy: annual * 0.0095, cChild: annual * 0.0036,
+  };
+}
+
+// 賞与算定
+function calcBonus(bonusAnnual, joinDateStr) {
+  const half = bonusAnnual / 2;
+  let from = null;
+  if (joinDateStr) {
+    const j = new Date(joinDateStr);
+    from = new Date(j.getFullYear(), j.getMonth(), 1);
+    if (j.getDate() > 1) from.setMonth(from.getMonth() + 1);
+  }
+  function one(months) {
+    if (!from) return { eligible: 6, amount: half, list: months.map(p => p.month + '月') };
+    const hits = months.filter(m => new Date(m.year, m.month-1, 1) >= from);
+    return { eligible: hits.length, amount: half * (hits.length / 6), list: hits.map(p => p.month + '月') };
+  }
+  const y = parseInt(document.getElementById('year').value) || 2025;
+  const sched = [
+    { label:`${y}年 6月支給`,    period:`${y-1}年11月〜${y}年4月`,    months:[{year:y-1,month:11},{year:y-1,month:12},{year:y,month:1},{year:y,month:2},{year:y,month:3},{year:y,month:4}] },
+    { label:`${y}年 12月支給`,   period:`${y}年5月〜${y}年10月`,      months:[{year:y,month:5},{year:y,month:6},{year:y,month:7},{year:y,month:8},{year:y,month:9},{year:y,month:10}] },
+    { label:`${y+1}年 6月支給`,  period:`${y}年11月〜${y+1}年4月`,    months:[{year:y,month:11},{year:y,month:12},{year:y+1,month:1},{year:y+1,month:2},{year:y+1,month:3},{year:y+1,month:4}] },
+    { label:`${y+1}年 12月支給`, period:`${y+1}年5月〜${y+1}年10月`,  months:[{year:y+1,month:5},{year:y+1,month:6},{year:y+1,month:7},{year:y+1,month:8},{year:y+1,month:9},{year:y+1,month:10}] },
+  ];
+  const results = sched.map(s => { const r = one(s.months); return { ...s, ...r, skipped: r.eligible === 0 }; });
+  const payable = results.filter(r => !r.skipped).slice(0, 2);
+  return { results, payable, total: payable.reduce((s,r) => s + r.amount, 0), half };
+}
+
+const fmtY  = n => Math.floor(n).toLocaleString('ja-JP') + '円';
+const fmtYe = n => n.toLocaleString('ja-JP', { maximumFractionDigits: 2, minimumFractionDigits: 0 }) + '円';
+const fmtM  = n => (n / 10000).toLocaleString('ja-JP', { maximumFractionDigits: 2, minimumFractionDigits: 0 }) + '万円';
+
+const ctx = document.getElementById('barChart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'bar',
+  data: { labels: [], datasets: [
+    { label: '手取り',     data: [], backgroundColor: 'rgba(14,165,233,0.75)', borderRadius: 4 },
+    { label: '社会保険料', data: [], backgroundColor: 'rgba(220,38,38,0.6)' },
+    { label: '税金',       data: [], backgroundColor: 'rgba(217,119,6,0.6)' },
+  ]},
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: '#64748b', font: { family: 'Noto Sans JP', size: 11 } } },
+      tooltip: { backgroundColor: '#fff', borderColor: '#e2e8f0', borderWidth: 1, titleColor: '#0f172a', bodyColor: '#475569', padding: 10,
+        callbacks: { label: c => ` ${c.dataset.label}: ${c.raw.toLocaleString()}万円` } }
+    },
+    scales: {
+      x: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { color: '#64748b', font: { size: 12, family: 'Noto Sans JP' } } },
+      y: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 11 }, callback: v => v + '万' } }
+    }
+  }
+});
+
+function update() {
+  const off  = OFFICE_DATA[document.getElementById('office').value];
+  const age  = parseInt(document.getElementById('age').value) || 35;
+  const join = document.getElementById('joinDate').value;
+  const dailyH = parseFloat(document.getElementById('dailyHours').value) || 8;
+  const otH    = parseFloat(document.getElementById('otHours').value) || 45;
+  const totalM = (parseFloat(document.getElementById('basicSalary').value) || 25) * 10000;
+  const bonusA = (parseFloat(document.getElementById('bonus').value) || 0) * 10000;
+  const useCU  = document.getElementById('careerUp').checked;
+
+  const totalM_up = Math.floor(totalM * 1.03);
+  const E    = calcEmp(totalM,    bonusA, age, dailyH, otH);
+  const E_up = calcEmp(totalM_up, bonusA, age, dailyH, otH);
+  const BD   = calcBonus(bonusA, join);
+
+  // --- 労働時間サマリー ---
+  const regH = E.regH, totH = regH + otH;
+  document.getElementById('work-hours-summary').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">
+      ${[
+        { l:'月平均所定労働日数', v: AVG_WORK_DAYS.toFixed(2)+'日', s:'固定値（20.16日）' },
+        { l:'月所定労働時間',     v: regH.toFixed(2)+'h',           s:`20.16日×${dailyH}h` },
+        { l:'固定残業時間',       v: otH+'h',                        s:'入力値' },
+        { l:'月総労働時間',       v: totH.toFixed(2)+'h',            s:'所定＋固定残業' },
+      ].map(x=>`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px">
+        <div style="font-size:10px;color:#64748b;margin-bottom:2px">${x.l}</div>
+        <div style="font-size:15px;font-weight:700;color:#0f172a;font-family:'JetBrains Mono',monospace">${x.v}</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:1px">${x.s}</div>
+      </div>`).join('')}
+    </div>`;
+
+  // --- 固定残業グリッド ---
+  document.getElementById('ot-grid').innerHTML = [
+    { l:'月額総支給（入力値）',        v: fmtM(totalM),   s:'固定残業込の額面' },
+    { l:'逆算：基本給',                v: fmtY(E.basicM),  s:`総支給÷(${regH.toFixed(2)}h+${otH}h×1.25)×${regH.toFixed(2)}h` },
+    { l:`逆算：固定残業代（${otH}h）`, v: fmtY(E.otPay),   s:'総支給 − 基本給' },
+    { l:'年収（賞与込）',              v: fmtM(E.annual),  s:`賞与${fmtM(bonusA)}含む` },
+  ].map(x=>`<div class="ot-item"><div class="ot-item-label">${x.l}</div><div class="ot-item-val">${x.v}</div><div class="ot-item-sub">${x.s}</div></div>`).join('');
+
+  // --- 時給比較 ---
+  const aH = E.actualH, mW = off.minWage, ok = aH >= mW, maxH = Math.max(aH,mW)*1.18;
+  document.getElementById('hourly-section').innerHTML = `
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;font-weight:700">⏱ 実質時給 vs ${off.label}の最低賃金（${mW.toLocaleString()}円）</div>
+    <div class="hourly-row">
+      <span class="hourly-row-label">実質時給（固定残業込）</span>
+      <div class="hourly-bar-bg"><div class="hourly-bar-fill" style="width:${Math.min(aH/maxH*100,100)}%;background:${ok?'#0ea5e9':'#ef4444'}">${fmtYe(aH)}</div></div>
+    </div>
+    <div class="hourly-row">
+      <span class="hourly-row-label">${off.label}の最低賃金</span>
+      <div class="hourly-bar-bg"><div class="hourly-bar-fill" style="width:${Math.min(mW/maxH*100,100)}%;background:#94a3b8">${mW.toLocaleString()}円</div></div>
+    </div>
+    <div><span class="hw-badge ${ok?'hw-ok':'hw-ng'}">${ok?'✔ 最低賃金をクリア':'✖ 最低賃金を下回っています'}（差額: ${ok?'+':''}${fmtYe(aH-mW)}）</span></div>
+    <div style="margin-top:8px;font-size:10px;color:var(--text-light)">
+      ※実質時給 ＝ ${fmtM(totalM)} ÷ ${totH.toFixed(2)}h ＝ ${fmtYe(aH)}/h　|　基本時給 ${fmtYe(E.hourlyBase)}/h
+    </div>`;
+
+  // --- 賞与内訳 ---
+  if (bonusA <= 0) {
+    document.getElementById('bonus-breakdown').innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding:4px 0">賞与なし（年間合計が0円）</div>`;
+  } else {
+    const showRows = [];
+    let cnt = 0;
+    for (const r of BD.results) { showRows.push(r); if (!r.skipped) cnt++; if (cnt >= 2) break; }
+    document.getElementById('bonus-breakdown').innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px">
+        ${showRows.map(b=>`
+          <div style="background:${b.skipped?'#f8fafc':'#f0fdf4'};border:1.5px solid ${b.skipped?'#e2e8f0':'#86efac'};border-radius:10px;padding:14px 16px">
+            <div style="font-size:10px;font-weight:700;color:${b.skipped?'#94a3b8':'#15803d'};font-family:'JetBrains Mono',monospace;margin-bottom:6px">${b.label}${b.skipped?' （支給なし）':''}</div>
+            <div style="font-size:20px;font-weight:900;color:${b.skipped?'#94a3b8':'#166534'}">${b.skipped?'−':fmtM(b.amount)}</div>
+            ${!b.skipped?`<div style="font-size:10px;color:#64748b;margin-top:3px">満額 ${fmtM(BD.half)} の ${b.eligible}/6ヶ月 分</div>`:`<div style="font-size:10px;color:#94a3b8;margin-top:3px">算定期間内の在籍月数：0ヶ月</div>`}
+            <div style="margin-top:8px;border-top:1px solid ${b.skipped?'#e2e8f0':'#bbf7d0'};padding-top:8px">
+              <div style="font-size:10px;color:#64748b;margin-bottom:3px">算定期間：${b.period}</div>
+              <div style="font-size:11px;color:${b.skipped?'#94a3b8':'#15803d'};font-weight:600">算入月：${b.list.length>0?b.list.join('・'):'対象月なし'}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;font-size:12px;display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--text-muted)">直近2回の受取賞与合計（按分後）</span>
+        <span style="font-weight:900;color:#0f172a;font-size:16px">${fmtM(BD.total)}</span>
+      </div>
+      ${BD.total < bonusA?`<div style="margin-top:8px;font-size:10px;color:var(--text-muted)">※入社日（${join}）による按分。満額 ${fmtM(bonusA)} に対し <span style="color:#dc2626;font-weight:700">${fmtM(bonusA-BD.total)} 減（${((1-BD.total/bonusA)*100).toFixed(1)}%減）</span></div>`:''}`;
+  }
+
+  // --- キャリアアップ助成金カード ---
+  const cuCard = document.getElementById('cu-card');
+  if (!useCU) {
+    cuCard.style.display = 'none';
+  } else {
+    cuCard.style.display = 'block';
+    let sixMonthStr = '';
+    if (join) {
+      const d = new Date(join); d.setMonth(d.getMonth() + 6);
+      sixMonthStr = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+    }
+
+    // 縦並び2カラム比較
+    document.getElementById('cu-content').innerHTML = `
+      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;font-size:12px;color:var(--orange);font-weight:700;margin-bottom:16px">
+        📅 昇給日：${sixMonthStr}　|　月額総支給 ${fmtM(totalM)} → ${fmtM(totalM_up)}（+3%・+${fmtY(totalM_up - totalM)}/月）
+      </div>
+      <div class="cu-compare">
+        <div class="cu-col base">
+          <div class="cu-col-tag">💼 助成金なし（現在）</div>
+          <div class="cu-col-amount">${fmtM(E.takeHome / 12)}<span style="font-size:12px;font-weight:400;color:var(--text-muted)">/月</span></div>
+          <div class="cu-col-sub">年間手取: ${fmtM(E.takeHome)}</div>
+          <div class="cu-col-rows">
+            <div class="cu-col-row"><span>月額総支給</span><span style="font-family:'JetBrains Mono',monospace">${fmtM(totalM)}</span></div>
+            <div class="cu-col-row"><span>　逆算：基本給</span><span style="font-family:'JetBrains Mono',monospace">${fmtY(E.basicM)}</span></div>
+            <div class="cu-col-row"><span>　逆算：固定残業代</span><span style="font-family:'JetBrains Mono',monospace">${fmtY(E.otPay)}</span></div>
+            <div class="cu-col-row" style="margin-top:6px;border-top:1px solid #bfdbfe;padding-top:6px"><span>社会保険料</span><span style="color:#dc2626;font-family:'JetBrains Mono',monospace">−${fmtM(E.totalSI)}</span></div>
+            <div class="cu-col-row"><span>所得税</span><span style="color:#d97706;font-family:'JetBrains Mono',monospace">−${fmtM(E.it)}</span></div>
+            <div class="cu-col-row"><span>住民税</span><span style="color:#d97706;font-family:'JetBrains Mono',monospace">−${fmtM(E.rt)}</span></div>
+          </div>
+        </div>
+        <div class="cu-col up">
+          <div class="cu-col-tag">🎯 助成金あり（6ヶ月後〜）</div>
+          <div class="cu-col-amount">${fmtM(E_up.takeHome / 12)}<span style="font-size:12px;font-weight:400;color:var(--text-muted)">/月</span></div>
+          <div class="cu-col-sub">年間手取: ${fmtM(E_up.takeHome)}</div>
+          <div class="cu-col-rows">
+            <div class="cu-col-row"><span>月額総支給</span><span style="font-family:'JetBrains Mono',monospace">${fmtM(totalM_up)}</span></div>
+            <div class="cu-col-row"><span>　逆算：基本給</span><span style="font-family:'JetBrains Mono',monospace">${fmtY(E_up.basicM)}</span></div>
+            <div class="cu-col-row"><span>　逆算：固定残業代</span><span style="font-family:'JetBrains Mono',monospace">${fmtY(E_up.otPay)}</span></div>
+            <div class="cu-col-row" style="margin-top:6px;border-top:1px solid #fed7aa;padding-top:6px"><span>社会保険料</span><span style="color:#dc2626;font-family:'JetBrains Mono',monospace">−${fmtM(E_up.totalSI)}</span></div>
+            <div class="cu-col-row"><span>所得税</span><span style="color:#d97706;font-family:'JetBrains Mono',monospace">−${fmtM(E_up.it)}</span></div>
+            <div class="cu-col-row"><span>住民税</span><span style="color:#d97706;font-family:'JetBrains Mono',monospace">−${fmtM(E_up.rt)}</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:14px 18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
+        ${[
+          { l:'月間手取り増加額', v:'+'+fmtM((E_up.takeHome-E.takeHome)/12), c:'#059669' },
+          { l:'年間手取り増加額', v:'+'+fmtM(E_up.takeHome-E.takeHome),      c:'#059669' },
+          { l:'月額総支給の増加', v:'+'+fmtY(totalM_up-totalM),               c:'#ea580c' },
+          { l:'年間総支給の増加', v:'+'+fmtM((totalM_up-totalM)*12),          c:'#ea580c' },
+        ].map(x=>`<div><div style="font-size:10px;color:#64748b;margin-bottom:3px">${x.l}</div><div style="font-size:18px;font-weight:900;color:${x.c};font-family:'JetBrains Mono',monospace">${x.v}</div></div>`).join('')}
+      </div>`;
+  }
+
+  // --- 詳細テーブル ---
+  const showUp = useCU;
+  document.getElementById('detail-thead').innerHTML = `<tr>
+    <th>項目</th>
+    <th class="th-base">助成金なし</th>
+    ${showUp?`<th class="th-up">助成金あり（+3%）</th><th class="th-diff">差額</th>`:''}
+  </tr>`;
+
+  const rows = [
+    { l:'月額総支給（残業込）',              e:E.totalM,           u:E_up.totalM },
+    { l:'　逆算：基本給',                    e:E.basicM,           u:E_up.basicM,  yen:true },
+    { l:`　逆算：固定残業代（${otH}h/月）`,  e:E.otPay,            u:E_up.otPay,   yen:true },
+    { l:'賞与（直近2回・按分後）',           e:BD.total>0?BD.total:null, u:null, noUp:true },
+    ...BD.payable.map(r=>({ l:`　${r.label}（${r.eligible}/6ヶ月）`, e:r.amount, u:null, noUp:true })),
+    { l:'額面年収（月額×12＋賞与）',        e:E.annual,           u:E_up.annual,   h:true },
+    { l:'給与所得控除',                      e:E.empDed,           u:E_up.empDed },
+    { l:'健康保険料（本人負担）',            e:E.health,           u:E_up.health },
+    ...(age>=40?[{ l:'介護保険料', e:E.nursing, u:E_up.nursing }]:[]),
+    { l:'厚生年金',                          e:E.pension,          u:E_up.pension },
+    { l:'雇用保険',                          e:E.employ,           u:E_up.employ },
+    { l:'社会保険料 合計',                   e:E.totalSI,          u:E_up.totalSI },
+    { l:'所得税（復興特別含む）',            e:E.it,               u:E_up.it },
+    { l:'住民税（概算）',                    e:E.rt,               u:E_up.rt },
+    { l:'税金 合計',                         e:E.totalTax,         u:E_up.totalTax },
+    { l:'年間手取り',                        e:E.takeHome,         u:E_up.takeHome, h:true },
+    { l:'月間手取り（概算）',               e:E.takeHome/12,      u:E_up.takeHome/12, h:true },
+  ];
+
+  document.getElementById('detail-tbody').innerHTML = rows.map(row => {
+    const fmt = row.yen ? fmtY : fmtM;
+    const eStr = (row.e != null && row.e > 1) ? fmt(row.e) : '−';
+    const uStr = (showUp && !row.noUp && row.u != null && row.u > 1) ? fmt(row.u) : (showUp && !row.noUp ? '−' : null);
+    const dVal = (showUp && !row.noUp && row.e != null && row.u != null) ? row.u - row.e : null;
+    const dStr = dVal != null ? `<span style="color:${dVal>0?'var(--green)':dVal<0?'var(--red)':'var(--text-muted)'}">${dVal>=0?'+':''}${fmt(dVal)}</span>` : (showUp && !row.noUp ? '−' : null);
+    const hl = row.h ? ' class="hl"' : '';
+    return `<tr${hl}><td>${row.l}</td><td style="text-align:right;font-family:'JetBrains Mono',monospace">${eStr}</td>${showUp?`<td style="text-align:right;font-family:'JetBrains Mono',monospace">${uStr??'−'}</td><td style="text-align:right;font-family:'JetBrains Mono',monospace">${dStr??'−'}</td>`:''}</tr>`;
+  }).join('');
+
+  // --- チャート ---
+  const r = n => Math.round(n / 10000);
+  if (showUp) {
+    chart.data.labels = ['助成金なし', '助成金あり（+3%）'];
+    chart.data.datasets[0].data = [r(E.takeHome),  r(E_up.takeHome)];
+    chart.data.datasets[1].data = [r(E.totalSI),   r(E_up.totalSI)];
+    chart.data.datasets[2].data = [r(E.totalTax),  r(E_up.totalTax)];
+  } else {
+    chart.data.labels = ['年収内訳'];
+    chart.data.datasets[0].data = [r(E.takeHome)];
+    chart.data.datasets[1].data = [r(E.totalSI)];
+    chart.data.datasets[2].data = [r(E.totalTax)];
+  }
+  chart.update();
+
+  // --- 会社負担 ---
+  document.getElementById('burden-grid').innerHTML = [
+    { l:'健康保険（会社負担）', v:E.cHealth },
+    { l:'厚生年金（会社負担）', v:E.cPension },
+    { l:'雇用保険（会社負担）', v:E.cEmploy },
+    { l:'子ども・子育て拠出',   v:E.cChild },
+  ].map(b=>`<div class="burden-item"><div class="burden-label">${b.l}</div><div class="burden-val">${fmtM(b.v)}</div></div>`).join('');
+  const tb = E.cHealth + E.cNursing + E.cPension + E.cEmploy + E.cChild;
+  document.getElementById('burden-total').innerHTML =
+    `会社負担合計（年額）：<em>${fmtM(tb)}</em>　→ 正社員の「真のコスト」：<em>${fmtM(E.annual + tb)}</em>／年`;
+}
+
+['office','age','joinDate','dailyHours','otHours','basicSalary','bonus','year'].forEach(id => {
+  document.getElementById(id).addEventListener('input', update);
+  document.getElementById(id).addEventListener('change', update);
+});
+document.getElementById('careerUp').addEventListener('change', update);
+update();
+</script>
+</body>
+</html>
